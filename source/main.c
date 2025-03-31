@@ -10,6 +10,7 @@
 #define BLOCK_SIZE 30
 #define WIDTH 10
 #define HEIGHT 20
+#define INFO_WIDTH 10
 #define SCREEN_WIDTH (BLOCK_SIZE * WIDTH)
 #define SCREEN_HEIGHT (BLOCK_SIZE * HEIGHT)
 
@@ -118,16 +119,69 @@ bool gameOver() {
     return false;
 }
 
+void blinkLines(int* linesToClear, int count) {
+    for (int i = 0; i < 3; i++) {
+
+        for (int j = 0; j < count; j++) {
+            int y = linesToClear[j];
+            for (int x = 0; x < WIDTH; x++) {
+                grid[y][x] = (i % 2 == 0) ? 0 : 8;
+            }
+        }
+        render();
+        SDL_Delay(100);
+    }
+}
+
+
 
 void drawBlock(int x, int y, int colorIndex) {
-    SDL_Rect block = {x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE};
+    SDL_Color base = colors[colorIndex];
+    int px = x * BLOCK_SIZE;
+    int py = y * BLOCK_SIZE;
 
-    SDL_SetRenderDrawColor(renderer, colors[colorIndex].r, colors[colorIndex].g, colors[colorIndex].b, 255);
-    SDL_RenderFillRect(renderer, &block);
+    int bandHeight = BLOCK_SIZE / 5;
+
+    SDL_SetRenderDrawColor(renderer,
+        (Uint8)(base.r + (255 - base.r) * 0.9),
+        (Uint8)(base.g + (255 - base.g) * 0.9),
+        (Uint8)(base.b + (255 - base.b) * 0.9), 255);
+    SDL_Rect top = {px, py, BLOCK_SIZE, bandHeight};
+    SDL_RenderFillRect(renderer, &top);
+
+    SDL_SetRenderDrawColor(renderer,
+        (Uint8)(base.r + (255 - base.r) * 0.4),
+        (Uint8)(base.g + (255 - base.g) * 0.4),
+        (Uint8)(base.b + (255 - base.b) * 0.4), 255);
+    SDL_Rect topMid = {px, py + bandHeight, BLOCK_SIZE, bandHeight};
+    SDL_RenderFillRect(renderer, &topMid);
+
+    SDL_SetRenderDrawColor(renderer, base.r, base.g, base.b, 255);
+    SDL_Rect mid = {px, py + bandHeight * 2, BLOCK_SIZE, bandHeight};
+    SDL_RenderFillRect(renderer, &mid);
+
+    SDL_SetRenderDrawColor(renderer,
+        (Uint8)(base.r * 0.8),
+        (Uint8)(base.g * 0.8),
+        (Uint8)(base.b * 0.8), 255);
+    SDL_Rect bottomMid = {px, py + bandHeight * 3, BLOCK_SIZE, bandHeight};
+    SDL_RenderFillRect(renderer, &bottomMid);
+
+    SDL_SetRenderDrawColor(renderer,
+        (Uint8)(base.r * 0.5),
+        (Uint8)(base.g * 0.5),
+        (Uint8)(base.b * 0.5), 255);
+    SDL_Rect bottom = {px, py + bandHeight * 4, BLOCK_SIZE, BLOCK_SIZE - bandHeight * 4};
+    SDL_RenderFillRect(renderer, &bottom);
 
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-    SDL_RenderDrawRect(renderer, &block);
+    SDL_Rect outline = {px, py, BLOCK_SIZE, BLOCK_SIZE};
+    SDL_RenderDrawRect(renderer, &outline);
 }
+
+
+
+
 
 
 void drawBorder() {
@@ -172,46 +226,55 @@ void handleMenuInput(SDL_Event event, bool* quit) {
 
 
 void clearLines() {
-    int linesCleared = 0;
+    int linesToClear[4];
+    int count = 0;
 
-    for (int y = HEIGHT - 1; y >= 0; y--) {
-        bool lineComplete = true;
+    for (int y = 0; y < HEIGHT; y++) {
+        bool full = true;
         for (int x = 0; x < WIDTH; x++) {
             if (grid[y][x] == 0) {
-                lineComplete = false;
+                full = false;
                 break;
             }
         }
-
-        if (lineComplete) {
-            for (int row = y; row > 0; row--) {
-                for (int col = 0; col < WIDTH; col++) {
-                    grid[row][col] = grid[row - 1][col];
-                }
-            }
-            for (int col = 0; col < WIDTH; col++) {
-                grid[0][col] = 0;
-            }
-
-            linesCleared++;
-            y++;
+        if (full) {
+            linesToClear[count++] = y;
         }
     }
 
-    switch (linesCleared) {
+    if (count > 0) {
+        blinkLines(linesToClear, count);
+    }
+
+    for (int i = 0; i < count; i++) {
+        int line = linesToClear[i];
+
+        for (int y = line; y > 0; y--) {
+            for (int x = 0; x < WIDTH; x++) {
+                grid[y][x] = grid[y - 1][x];
+            }
+        }
+
+        for (int x = 0; x < WIDTH; x++) {
+            grid[0][x] = 0;
+        }
+    }
+
+    switch (count) {
         case 1: score += 40 * level; break;
         case 2: score += 100 * level; break;
         case 3: score += 300 * level; break;
         case 4: score += 1200 * level; break;
     }
 
-    linesClearedTotal += linesCleared;
-
+    linesClearedTotal += count;
     if (linesClearedTotal / 10 + 1 > level) {
         level = linesClearedTotal / 10 + 1;
         fallDelay = fallDelay > 100 ? fallDelay - 50 : fallDelay;
     }
 }
+
+
 
 
 int main() {

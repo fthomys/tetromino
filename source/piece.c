@@ -1,13 +1,14 @@
 #include "piece.h"
 
-SDL_Color colors[7] = {
+SDL_Color colors[8] = {
     {0, 255, 255, 255}, // Cyan - I
     {255, 255, 0, 255}, // Yellow - O
     {0, 255, 0, 255},   // Green - S
     {255, 0, 0, 255},   // Red - Z
     {0, 0, 255, 255},   // Blue - J
     {255, 165, 0, 255}, // Orange - L
-    {128, 0, 128, 255}  // Purple - T
+    {128, 0, 128, 255},  // Purple - T
+    {255,255,255}
 };
 
 int shapes[8][4][4] = {
