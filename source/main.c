@@ -11,8 +11,9 @@
 #define WIDTH 10
 #define HEIGHT 20
 #define INFO_WIDTH 10
-#define SCREEN_WIDTH (BLOCK_SIZE * WIDTH)
 #define SCREEN_HEIGHT (BLOCK_SIZE * HEIGHT)
+#define SCREEN_WIDTH (BLOCK_SIZE * (WIDTH + INFO_WIDTH))
+
 
 SDL_Window* window;
 SDL_Renderer* renderer;
@@ -27,6 +28,7 @@ int currentPiece[4][4];
 int currentPiecePosX = WIDTH / 2 - 2, currentPiecePosY = 0;
 int currentPieceColor;
 
+int nextPieceColor;
 
 
 typedef enum {
@@ -59,6 +61,7 @@ void render();
 void drawText(const char* text, int x, int y, SDL_Color color);
 void drawGameOver();
 void drawBorder();
+void drawBlock(int x, int y, int colorIndex);
 void drawMenu();
 void handleMenuInput(SDL_Event event, bool* quit);
 
@@ -133,6 +136,37 @@ void blinkLines(int* linesToClear, int count) {
     }
 }
 
+void drawInfoPanel() {
+    SDL_Color white = {255, 255, 255, 255};
+
+    int infoX = WIDTH * BLOCK_SIZE + 20;
+
+    char buffer[64];
+
+    drawText("Game Info", infoX, 10, white);
+    drawText("---------", infoX, 30, white);
+
+    sprintf(buffer, "Score: %d", score);
+    drawText(buffer, infoX, 60, white);
+
+    sprintf(buffer, "Level: %d", level);
+    drawText(buffer, infoX, 90, white);
+
+    sprintf(buffer, "Lines: %d", linesClearedTotal);
+    drawText(buffer, infoX, 120, white);
+
+    drawText("Next:", infoX, 170, white);
+
+    for (int y = 0; y < 4; y++) {
+        for (int x = 0; x < 4; x++) {
+            if (shapes[nextPieceColor - 1][y][x]) {
+                int px = WIDTH + 1 + x;
+                int py = 7 + y;
+                drawBlock(px, py, nextPieceColor - 1);
+            }
+        }
+    }
+}
 
 
 void drawBlock(int x, int y, int colorIndex) {
@@ -183,10 +217,9 @@ void drawBlock(int x, int y, int colorIndex) {
 
 
 
-
 void drawBorder() {
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    SDL_Rect border = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
+    SDL_Rect border = {0, 0, BLOCK_SIZE * WIDTH, BLOCK_SIZE * HEIGHT};
     SDL_RenderDrawRect(renderer, &border);
 }
 
@@ -246,17 +279,30 @@ void clearLines() {
         blinkLines(linesToClear, count);
     }
 
-    for (int i = 0; i < count; i++) {
-        int line = linesToClear[i];
+    int dst = HEIGHT - 1;
 
-        for (int y = line; y > 0; y--) {
-            for (int x = 0; x < WIDTH; x++) {
-                grid[y][x] = grid[y - 1][x];
+    for (int src = HEIGHT - 1; src >= 0; src--) {
+        bool isCleared = false;
+        for (int i = 0; i < count; i++) {
+            if (src == linesToClear[i]) {
+                isCleared = true;
+                break;
             }
         }
 
+        if (!isCleared) {
+            if (dst != src) {
+                for (int x = 0; x < WIDTH; x++) {
+                    grid[dst][x] = grid[src][x];
+                }
+            }
+            dst--;
+        }
+    }
+
+    for (int y = dst; y >= 0; y--) {
         for (int x = 0; x < WIDTH; x++) {
-            grid[0][x] = 0;
+            grid[y][x] = 0;
         }
     }
 
@@ -268,11 +314,15 @@ void clearLines() {
     }
 
     linesClearedTotal += count;
-    if (linesClearedTotal / 10 + 1 > level) {
-        level = linesClearedTotal / 10 + 1;
-        fallDelay = fallDelay > 100 ? fallDelay - 50 : fallDelay;
+
+    int newLevel = linesClearedTotal / 10 + 1;
+    if (newLevel > level) {
+        level = newLevel;
+        fallDelay = 500 - (level - 1) * 30;
+        if (fallDelay < 100) fallDelay = 100;
     }
 }
+
 
 
 
@@ -289,6 +339,7 @@ int main() {
 
     srand(SDL_GetTicks());
     currentPieceColor = rand() % 7 + 1;
+    nextPieceColor = rand() % 7 + 1;
     for (int y = 0; y < 4; y++) {
         for (int x = 0; x < 4; x++) {
             currentPiece[y][x] = shapes[currentPieceColor - 1][y][x];
@@ -363,7 +414,7 @@ bool initialize() {
         return false;
     }
 */
-    window = SDL_CreateWindow("TETROMINO", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT + 60, SDL_WINDOW_SHOWN);
+    window = SDL_CreateWindow("TETROMINO", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
     font = TTF_OpenFont("Arial.ttf", 24);
@@ -481,7 +532,8 @@ void fixPiece() {
 
     clearLines();
 
-    currentPieceColor = rand() % 7 + 1;
+    currentPieceColor = nextPieceColor;
+    nextPieceColor = rand() % 7 + 1;
     currentPiecePosX = WIDTH / 2 - 2;
     currentPiecePosY = 0;
     for (int y = 0; y < 4; y++) {
@@ -532,14 +584,7 @@ void render() {
     drawGrid();
     drawBorder();
     drawPiece();
-
-    char buffer[64];
-    SDL_Color white = {255, 255, 255, 255};
-    sprintf(buffer, "Score: %d", score);
-    drawText(buffer, 10, SCREEN_HEIGHT + 5, white);
-
-    sprintf(buffer, "Level: %d", level);
-    drawText(buffer, 200, SCREEN_HEIGHT + 5, white);
+    drawInfoPanel();
 
     SDL_RenderPresent(renderer);
 }
